@@ -1,14 +1,19 @@
-$script_master=<<SCRIPT
+$script_swap=<<SCRIPT
+sudo swapoff -a && \
+sudo sed -i '/ swap / s/^\(.*\)$/#\1/g' /etc/fstab
+SCRIPT
+
+$script_nodes_setup=<<SCRIPT
 sudo su && \
+apt-get update && \
 curl -fsSL https://get.docker.com | bash && \
 apt-get update && apt-get install -y apt-transport-https && \
 curl -s https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key add - && \
 echo "deb http://apt.kubernetes.io/ kubernetes-xenial main" > /etc/apt/sources.list.d/kubernetes.list && \
-apt-get update &&  apt-get install -y kubelet kubeadm kubectl && \
+apt-get update &&  apt-get install -y kubelet kubeadm kubectl && \ 
 docker info | grep -i cgroup && \
 sed -i "s/cgroup-driver=systemd/cgroup-driver=cgroupfs/g" /etc/systemd/system/kubelet.service.d/10-kubeadm.conf && \
-systemctl daemon-reload && systemctl restart kubelet && swapoff -a && \
- kubeadm init
+systemctl daemon-reload && systemctl restart kubelet
 SCRIPT
 Vagrant.configure("2") do |config|
   config.vm.box = "generic/ubuntu1810"
@@ -19,7 +24,9 @@ Vagrant.configure("2") do |config|
       h.cpus=2
       h.memory=1024 
     end
-    master.vm.provision "shell" , inline: $script_master
+     master.vm.provision "shell" , inline:$script_swap
+#    master.vm.provision "shell" , inline: $script_nodes_setup
+#    master.vm.provision "shell" , inline: "sudo kubeadm init"
   end
 
   config.vm.define "nodeA" do |nodeA|
@@ -28,6 +35,7 @@ Vagrant.configure("2") do |config|
       h.cpus=2
       h.memory=1024 
     end 
+    nodeA.vm.provision "shell" , inline: $script_nodes_setup
   end
 
   config.vm.define "nodeB" do |nodeB|
@@ -36,5 +44,6 @@ Vagrant.configure("2") do |config|
       h.cpus=2
       h.memory=1024 
     end 
+    nodeB.vm.provision "shell" , inline: $script_nodes_setup
   end
 end
